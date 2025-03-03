@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import Icons from '../components/Icons';
+import Icons from '@/app/components/Icons';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, PointElement, CategoryScale, LinearScale } from 'chart.js';
 
