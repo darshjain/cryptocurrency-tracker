@@ -1,101 +1,193 @@
-import Image from "next/image";
+"use client"
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import Icons from '../components/Icons';
+import { Line } from 'react-chartjs-2';
+import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, PointElement, CategoryScale, LinearScale } from 'chart.js';
 
-export default function Home() {
+ChartJS.register(Title, Tooltip, Legend, LineElement, PointElement, CategoryScale, LinearScale);
+
+export default function Crypto() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [retry, setRetry] = useState(false);
+  const [graphData, setGraphData] = useState({});
+  const [timestamp, setTimestamp] = useState({});
+  const [showLoader, setShowLoader] = useState(true);
+
+  const API = process.env.NEXT_PUBLIC_API_URL;
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(API);
+      if (!response.ok) {
+        throw new Error('Failed to fetch data. Please try again later.');
+      }
+      const data = await response.json();
+      setData(data);
+      return data;
+    } catch (error) {
+      setError(error.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const trackPrices = async () => {
+      let newData = await fetchData();
+      if (newData !== null) {
+        Object.keys(newData).forEach((crypto) => {
+          const price = newData[crypto].usd;
+          const time = new Date().toLocaleTimeString();
+
+          setGraphData((prevData) => ({
+            ...prevData,
+            [crypto]: [...(prevData[crypto] || []), price],
+          }));
+
+          setTimestamp((prevTimestamp) => ({
+            ...prevTimestamp,
+            [crypto]: [...(prevTimestamp[crypto] || []), time],
+          }));
+        });
+      }
+    };
+
+    const interval = setInterval(() => {
+      trackPrices();
+    }, 3000);
+
+    const stopTracking = setTimeout(() => {
+      clearInterval(interval);
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(stopTracking);
+    };
+  }, [retry]);
+
+  useEffect(() => {
+    if (data !== null) {
+      setShowLoader(false);
+    }
+  }, [data]);
+
+  const handleRefresh = () => {
+    setRetry(!retry);
+    setShowLoader(true);
+  };
+
+  const filterData = (term) => {
+    if (!data) return [];
+    return Object.keys(data)
+      .filter((key) => key.toLowerCase().includes(term.toLowerCase()))
+      .map((key) => ({ name: key, price: data[key].usd }));
+  };
+
+  const chartOptions = {
+    responsive: true,
+    scales: {
+      x: {
+        type: 'category',
+        labels: (timestamp[crypto] || []).slice(-3),
+      },
+      y: {
+        beginAtZero: false,
+      },
+    },
+  };
+
+  const getChartData = (crypto) => ({
+    labels: timestamp[crypto] || [],
+    datasets: [
+      {
+        label: `${crypto} Price (USD)`,
+        data: graphData[crypto] || [],
+        fill: false,
+        borderColor: 'rgba(255, 99, 132, 1)',
+        tension: 0.1,
+      },
+    ],
+  });
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="h-screen bg-gradient-to-r from-blue-800 to-gray-800 p-6 overflow-y-auto">
+      <h1 className="text-4xl font-extrabold text-white text-center mb-10 drop-shadow-lg">Cryptocurrency Tracker Dashboard</h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="mb-8 flex justify-center">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search Cryptocurrency..."
+            className="p-4 pl-12 rounded-full border-2 border-gray-300 w-96 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={handleRefresh}
+          className="ml-4 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition duration-300"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          <Image src={Icons.reload} alt="refresh" width={40} height={40} />
+
+        </button>
+      </div>
+
+      {showLoader && (
+        <div className="loader-container">
+          <div className="loader"></div>
+        </div>
+      )}
+
+      {!showLoader && (
+        <div>
+          {loading ? (
+            <div className="text-center text-xl text-gray-300">Loading...</div>
+          ) : error ? (
+            <div className="text-center text-xl text-red-500">
+              <p>{error}</p>
+              <button
+                onClick={handleRefresh}
+                className="mt-4 bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
+              {filterData(searchTerm).map((crypto) => (
+                <div key={crypto.name} className="bg-gray-900 p-6 rounded-lg shadow-md transform transition duration-300 hover:scale-105 hover:shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="text-2xl font-semibold text-white">
+                      {crypto.name.charAt(0).toUpperCase() + crypto.name.slice(1).toLowerCase()}
+                    </div>
+
+                    {Icons[crypto.name] ? (
+                      <Image src={Icons[crypto.name]} alt={crypto.name} width={40} height={40} />
+                    ) : (
+                      <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center text-white">?</div>
+                    )}
+                  </div>
+                  <div className="mt-4 text-lg text-gray-300 animate-pulse">${crypto.price.toFixed(2)}</div>
+
+                  <div className="mt-4" style={{ height: '120px', width: '100%' }}>
+                    <Line data={getChartData(crypto.name)} options={chartOptions} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+
     </div>
   );
 }
